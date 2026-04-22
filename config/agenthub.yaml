@@ -1,0 +1,84 @@
+server:
+  host: "127.0.0.1"
+  port: 8080
+
+llm:
+  default_provider: "mini"
+  providers:
+    # 简单模型
+    - name: "mini"
+      nickname: "简单模型"
+      description: "用于快速回复和简单任务"
+      type: openai
+      api_key: "sk-84zvzI8YviP3W9HF6d56043144B740119aD0356999127849"
+      model: "DeepSeek-R1-0528-Qwen3-8B"
+      api_endpoint: "https://api.edgefn.net/v1"
+      temperature: 0.7
+      timeout_secs: 120
+
+security:
+  max_input_length: 50000
+  
+  pii_detection:
+    enabled: true
+    redact_emails: true
+    redact_phones: true
+    redact_id_cards: true
+    redact_ips: false
+    redact_api_keys: true
+  
+  prompt_injection:
+    enabled: true
+    check_unicode: true
+    check_zero_width: true
+  
+  file_access:
+    enabled: true
+    workspace_dir: null
+    sensitive_files:
+      - ".env"
+      - ".git/"
+      - "id_rsa"
+      - "id_dsa"
+      - ".ssh/"
+      - ".aws/"
+      - ".bash_history"
+      - ".zsh_history"
+    allow_symlinks: false
+  
+  network:
+    enabled: true
+    allow_external: false
+    allowed_domains: []
+    block_internal_ips: true
+  
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    max_burst: 10
+  
+  output_sanitizer:
+    enabled: true
+    strip_control_chars: true
+    redact_pii: true
+
+cache:
+  enabled: true
+  max_size: 1000
+  ttl_secs: 3600
+
+audit:
+  enabled: true
+  log_dir: "~/.agenthub/audit"
+  max_file_size_mb: 100
+
+retry:
+  max_retries: 3
+  initial_delay_ms: 1000
+  max_delay_secs: 30
+  multiplier: 2.0
+
+timeouts:
+  llm_request_secs: 120
+  skill_execution_secs: 300
+  http_request_secs: 30
