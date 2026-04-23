@@ -32,6 +32,9 @@ pub enum AgentHubError {
     #[error("File not found: {path}")]
     FileNotFound { path: String },
 
+    #[error("Multiple files found with name '{name}': {paths:?}")]
+    AmbiguousFile { name: String, paths: Vec<String> },
+
     #[error("Failed to read file: {path}")]
     FileReadError { path: String },
 

@@ -1,4 +1,5 @@
 use crate::api::cli::commands::{Command, ConversationAction, format_command_help};
+use crate::api::cli::nl_command_parser::NaturalLanguageCommandParser;
 use crate::audit::AuditLogger;
 use crate::config::Settings;
 use crate::error::Result;
@@ -20,6 +21,7 @@ pub struct Repl {
     llm_client: Arc<MultiLLMClient>,
     conversation_manager: ConversationManager,
     security_pipeline: SecurityPipeline,
+    nl_command_parser: Arc<NaturalLanguageCommandParser>,
 }
 
 impl Repl {
@@ -47,6 +49,7 @@ impl Repl {
 
         let audit_logger = AuditLogger::new(&settings);
         let security_pipeline = SecurityPipeline::new(settings.security.clone());
+        let nl_command_parser = Arc::new(NaturalLanguageCommandParser::new(llm_client.clone(), &skill_registry));
 
         Self {
             settings,
@@ -55,6 +58,7 @@ impl Repl {
             llm_client,
             conversation_manager,
             security_pipeline,
+            nl_command_parser,
         }
     }
 
@@ -109,10 +113,10 @@ impl Repl {
     async fn execute_command(&mut self, cmd: Command) -> Result<()> {
         match cmd {
             Command::Explain { file_path, function_name, line_range } => {
-                self.execute_explain(&file_path, function_name.as_deref(), line_range).await
+                self.execute_explain(&file_path, function_name.as_deref(), line_range).await.map(|_| ())
             }
             Command::Test { file_path, function_name } => {
-                self.execute_test(&file_path, &function_name).await
+                self.execute_test(&file_path, &function_name).await.map(|_| ())
             }
             Command::Skills => {
                 let skills = self.skill_registry.list_skills();
@@ -232,7 +236,7 @@ impl Repl {
         }
     }
 
-    async fn execute_explain(&self, file_path: &str, _function_name: Option<&str>, _line_range: Option<(usize, usize)>) -> Result<()> {
+    async fn execute_explain(&self, file_path: &str, _function_name: Option<&str>, _line_range: Option<(usize, usize)>) -> Result<String> {
         if let Some(skill) = self.skill_registry.get("code.explainer") {
             let params = serde_json::json!({
                 "file_path": file_path,
@@ -246,23 +250,75 @@ impl Repl {
 
             match skill.execute(params, &context).await {
                 Ok(result) => {
-                    println!();
-                    let output = match result.output {
-                        serde_json::Value::String(s) => s,
+                    let output = match &result.output {
+                        serde_json::Value::Object(map) => {
+                            map.get("explanation")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| result.output.to_string())
+                        }
+                        serde_json::Value::String(s) => s.clone(),
                         _ => result.output.to_string(),
                     };
+                    println!();
                     render_markdown(&output);
                     println!();
+                    return Ok(output);
                 }
                 Err(e) => {
-                    println!("Skill execution failed: {}", e);
+                    if let crate::error::AgentHubError::AmbiguousFile { name, paths } = &e {
+                        let selected = self.prompt_file_selection(name, paths).await?;
+                        return self.execute_explain_inner(&selected, _function_name, _line_range).await;
+                    }
+                    let error_msg = format!("Skill 执行失败: {}", e);
+                    println!("{}", error_msg);
+                    return Err(crate::error::AgentHubError::Internal(error_msg));
                 }
             }
         }
-        Ok(())
+        Ok("".to_string())
     }
 
-    async fn execute_test(&self, file_path: &str, function_name: &str) -> Result<()> {
+    async fn execute_explain_inner(&self, file_path: &str, _function_name: Option<&str>, _line_range: Option<(usize, usize)>) -> Result<String> {
+        if let Some(skill) = self.skill_registry.get("code.explainer") {
+            let params = serde_json::json!({
+                "file_path": file_path,
+                "language": "auto"
+            });
+
+            let context = ExecutionContext {
+                user_id: "cli-user".to_string(),
+                workspace_dir: std::env::current_dir().unwrap_or_default(),
+            };
+
+            match skill.execute(params, &context).await {
+                Ok(result) => {
+                    let output = match &result.output {
+                        serde_json::Value::Object(map) => {
+                            map.get("explanation")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| result.output.to_string())
+                        }
+                        serde_json::Value::String(s) => s.clone(),
+                        _ => result.output.to_string(),
+                    };
+                    println!();
+                    render_markdown(&output);
+                    println!();
+                    return Ok(output);
+                }
+                Err(e) => {
+                    let error_msg = format!("Skill 执行失败: {}", e);
+                    println!("{}", error_msg);
+                    return Err(crate::error::AgentHubError::Internal(error_msg));
+                }
+            }
+        }
+        Ok("".to_string())
+    }
+
+    async fn execute_test(&self, file_path: &str, function_name: &str) -> Result<String> {
         if let Some(skill) = self.skill_registry.get("code.test.generator") {
             let params = serde_json::json!({
                 "file_path": file_path,
@@ -277,20 +333,95 @@ impl Repl {
 
             match skill.execute(params, &context).await {
                 Ok(result) => {
-                    println!();
-                    let output = match result.output {
-                        serde_json::Value::String(s) => s,
+                    let output = match &result.output {
+                        serde_json::Value::Object(map) => {
+                            map.get("test_code")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| result.output.to_string())
+                        }
+                        serde_json::Value::String(s) => s.clone(),
                         _ => result.output.to_string(),
                     };
+                    println!();
                     render_markdown(&output);
                     println!();
+                    return Ok(output);
                 }
                 Err(e) => {
-                    println!("Skill execution failed: {}", e);
+                    if let crate::error::AgentHubError::AmbiguousFile { name, paths } = &e {
+                        let selected = self.prompt_file_selection(name, paths).await?;
+                        return self.execute_test_inner(&selected, function_name).await;
+                    }
+                    let error_msg = format!("Skill 执行失败: {}", e);
+                    println!("{}", error_msg);
+                    return Err(crate::error::AgentHubError::Internal(error_msg));
                 }
             }
         }
-        Ok(())
+        Ok("".to_string())
+    }
+
+    async fn execute_test_inner(&self, file_path: &str, function_name: &str) -> Result<String> {
+        if let Some(skill) = self.skill_registry.get("code.test.generator") {
+            let params = serde_json::json!({
+                "file_path": file_path,
+                "function_name": function_name,
+                "language": "auto"
+            });
+
+            let context = ExecutionContext {
+                user_id: "cli-user".to_string(),
+                workspace_dir: std::env::current_dir().unwrap_or_default(),
+            };
+
+            match skill.execute(params, &context).await {
+                Ok(result) => {
+                    let output = match &result.output {
+                        serde_json::Value::Object(map) => {
+                            map.get("test_code")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| result.output.to_string())
+                        }
+                        serde_json::Value::String(s) => s.clone(),
+                        _ => result.output.to_string(),
+                    };
+                    println!();
+                    render_markdown(&output);
+                    println!();
+                    return Ok(output);
+                }
+                Err(e) => {
+                    let error_msg = format!("Skill 执行失败: {}", e);
+                    println!("{}", error_msg);
+                    return Err(crate::error::AgentHubError::Internal(error_msg));
+                }
+            }
+        }
+        Ok("".to_string())
+    }
+
+    async fn prompt_file_selection(&self, name: &str, paths: &[String]) -> Result<String> {
+        println!();
+        println!("找到 {} 个匹配 '{}' 的文件:", paths.len(), name);
+        for (i, path) in paths.iter().enumerate() {
+            println!("  {}. {}", i + 1, path);
+        }
+        println!();
+        print!("请选择文件编号 (1-{}): ", paths.len());
+        use std::io::Write;
+        std::io::stdout().flush().map_err(|e| crate::error::AgentHubError::Internal(e.to_string()))?;
+        
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).map_err(|e| crate::error::AgentHubError::Internal(e.to_string()))?;
+        
+        if let Ok(index) = input.trim().parse::<usize>() {
+            if index >= 1 && index <= paths.len() {
+                return Ok(paths[index - 1].clone());
+            }
+        }
+        Err(crate::error::AgentHubError::Internal("无效的选择".to_string()))
     }
 
     async fn handle_conversation(&mut self, action: ConversationAction) -> Result<()> {
@@ -372,6 +503,44 @@ impl Repl {
             println!("安全警告: {}", check_result.warnings.join("; "));
         }
 
+        match self.nl_command_parser.parse(message).await {
+            Ok(Some(parsed)) => {
+                match self.nl_command_parser.parsed_to_command(&parsed) {
+                    Ok(cmd) => {
+                        println!("执行命令: {}", parsed.command_type);
+                        let result = self.execute_command_direct(cmd).await;
+                        if self.conversation_manager.get_active().is_none() {
+                            self.conversation_manager.create_conversation(None, None);
+                        }
+                        let user_message = ChatMessage::user(message);
+                        self.conversation_manager.add_message_to_active(user_message);
+                        match &result {
+                            Ok(output) => {
+                                let assistant_message = ChatMessage::assistant(output);
+                                self.conversation_manager.add_message_to_active(assistant_message);
+                            }
+                            Err(e) => {
+                                let error_message = ChatMessage::assistant(&format!("命令执行失败: {}", e));
+                                self.conversation_manager.add_message_to_active(error_message);
+                            }
+                        }
+                        return result.map(|_| ());
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to convert parsed command: {}", e);
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!("Natural language command parsing failed: {}", e);
+            }
+        }
+
+        self.do_chat(message).await
+    }
+
+    async fn do_chat(&mut self, message: &str) -> Result<()> {
         if self.conversation_manager.get_active().is_none() {
             self.conversation_manager.create_conversation(None, None);
         }
@@ -397,6 +566,141 @@ impl Repl {
         }
 
         Ok(())
+    }
+
+    async fn execute_command_direct(&mut self, cmd: Command) -> Result<String> {
+        match cmd {
+            Command::Explain { file_path, function_name, line_range } => {
+                self.execute_explain(&file_path, function_name.as_deref(), line_range).await
+            }
+            Command::Test { file_path, function_name } => {
+                self.execute_test(&file_path, &function_name).await
+            }
+            Command::Skills => {
+                let skills = self.skill_registry.list_skills();
+                let count = skills.len();
+                let mut output = String::from("\n已注册的 Skills:\n");
+                for skill in skills {
+                    output.push_str(&format!("  {} v{} - {}\n", skill.name, skill.version, skill.description));
+                }
+                output.push_str(&format!("\n共 {} 个 Skill", count));
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Audit { user_id, skill_name } => {
+                let events = self.audit_logger.query_events(
+                    user_id.as_deref(),
+                    skill_name.as_deref(),
+                ).await;
+                let mut output = format!("Audit events ({}):", events.len());
+                for event in &events {
+                    output.push_str(&format!(
+                        "\n  [{}] {} - {} ({})",
+                        event.timestamp,
+                        event.user_id,
+                        event.skill_name,
+                        event.status
+                    ));
+                }
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Config => {
+                let current_provider = self.llm_client.get_current_provider().await;
+                let provider_config = self.settings.llm.get_provider(&current_provider);
+                let mut output = String::from("\n当前配置:");
+                if let Some(config) = provider_config {
+                    let nickname = config.nickname.as_deref().unwrap_or(&config.name);
+                    output.push_str(&format!("\n  LLM 提供商: {} ({})", nickname, config.model));
+                    output.push_str(&format!("\n  端点: {}", config.api_endpoint));
+                }
+                output.push_str(&format!("\n  服务地址: {}:{}", self.settings.server.host, self.settings.server.port));
+                output.push_str("\n  安全设置:");
+                output.push_str(&format!("\n    - PII 检测: {}", if self.settings.security.pii_detection.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 注入检测: {}", if self.settings.security.prompt_injection.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 文件访问控制: {}", if self.settings.security.file_access.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 网络访问控制: {}", if self.settings.security.network.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 速率限制: {}", if self.settings.security.rate_limit.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 输出消毒: {}", if self.settings.security.output_sanitizer.enabled { "开启" } else { "关闭" }));
+                output.push_str(&format!("\n    - 最大输入长度: {} 字符", self.settings.security.max_input_length));
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Provider { name } => {
+                let output = match name {
+                    Some(provider_name) => {
+                        match self.llm_client.switch_provider(&provider_name).await {
+                            Ok(()) => {
+                                if let Some(config) = self.settings.llm.get_provider(&provider_name) {
+                                    let nickname = config.nickname.as_deref().unwrap_or(&provider_name);
+                                    format!("已切换到提供商: {} ({})", nickname, config.model)
+                                } else {
+                                    format!("已切换到提供商: {}", provider_name)
+                                }
+                            }
+                            Err(e) => {
+                                format!("切换失败: {}", e)
+                            }
+                        }
+                    }
+                    None => {
+                        let current = self.llm_client.get_current_provider().await;
+                        if let Some(config) = self.settings.llm.get_provider(&current) {
+                            let nickname = config.nickname.as_deref().unwrap_or(&current);
+                            format!("当前提供商: {} ({})", nickname, config.model)
+                        } else {
+                            format!("当前提供商: {}", current)
+                        }
+                    }
+                };
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Providers => {
+                let providers = self.llm_client.list_providers().await;
+                let current = self.llm_client.get_current_provider().await;
+                let mut output = String::from("\n可用的 LLM 提供商:");
+                for (i, provider) in providers.iter().enumerate() {
+                    let marker = if provider == &current { " [当前]" } else { "" };
+                    if let Some(config) = self.settings.llm.get_provider(provider) {
+                        let nickname = config.nickname.as_deref().unwrap_or(provider);
+                        output.push_str(&format!(
+                            "\n  {}. {}{} - {} ({})", 
+                            i + 1, provider, marker, nickname, config.model
+                        ));
+                        if let Some(desc) = &config.description {
+                            output.push_str(&format!("\n     {}", desc));
+                        }
+                    } else {
+                        output.push_str(&format!("\n  {}. {}{}", i + 1, provider, marker));
+                    }
+                }
+                output.push_str("\n\n使用 /provider <名称> 切换提供商");
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Conversation { action } => {
+                self.handle_conversation(action).await.map(|_| "对话操作完成".to_string())
+            }
+            Command::Chat { message } => {
+                self.do_chat(&message).await.map(|_| "对话完成".to_string())
+            }
+            Command::Clear => {
+                self.conversation_manager.clear_active();
+                let output = "对话历史已清除。".to_string();
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Help => {
+                let output = format!("\n可用命令:\n{}", format_command_help());
+                println!("{}", output);
+                Ok(output)
+            }
+            Command::Exit => {
+                println!("再见！");
+                std::process::exit(0);
+            }
+        }
     }
 }
 
