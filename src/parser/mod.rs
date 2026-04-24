@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod language_registry;
 pub mod ast_utils;
 pub mod rust_parser;

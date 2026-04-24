@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::error::{LlmError, Result};
+use crate::error::Result;
 use serde::{Deserialize, Serialize};
 
 pub mod mock;
@@ -10,7 +10,6 @@ pub mod multi_client;
 
 pub use mock::MockLLMClient;
 pub use ollama::OllamaClient;
-pub use cache::LLMCache;
 pub use openai::OpenAIClient;
 pub use multi_client::MultiLLMClient;
 
@@ -20,6 +19,7 @@ pub trait LLMClient: Send + Sync {
 
     async fn chat(&self, messages: &[ChatMessage]) -> Result<String>;
 
+    #[allow(dead_code)]
     fn set_model(&mut self, model: &str);
 }
 

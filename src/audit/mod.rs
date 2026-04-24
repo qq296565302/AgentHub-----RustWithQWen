@@ -1,7 +1,6 @@
 pub mod signed_log;
 
 use crate::config::Settings;
-use crate::error::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
@@ -21,10 +20,12 @@ pub struct AuditEvent {
 }
 
 pub struct AuditLogger {
+    #[allow(dead_code)]
     log_dir: PathBuf,
     events: Arc<Mutex<Vec<AuditEvent>>>,
 }
 
+#[allow(dead_code)]
 impl AuditLogger {
     pub fn new(settings: &Settings) -> Self {
         let log_dir = crate::config::expand_tilde(&settings.audit.log_dir);

@@ -11,6 +11,7 @@ pub struct OpenAIClient {
     base_url: String,
     api_key: String,
     model: String,
+    #[allow(dead_code)]
     connect_timeout: Duration,
     read_timeout: Duration,
 }
@@ -143,6 +144,7 @@ impl OpenAIClient {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_env() -> Self {
         let api_key = std::env::var("OPENAI_API_KEY")
             .expect("OPENAI_API_KEY environment variable not set");

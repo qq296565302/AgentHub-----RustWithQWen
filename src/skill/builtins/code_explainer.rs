@@ -2,12 +2,13 @@ use crate::error::Result;
 use crate::skill::{ExecutionContext, SkillExecutor, SkillResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct CodeExplainerInput {
     pub file_path: String,
+    #[allow(dead_code)]
     pub function_name: Option<String>,
+    #[allow(dead_code)]
     pub language: Option<String>,
 }
 

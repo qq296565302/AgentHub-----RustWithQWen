@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use metrics::{counter, gauge, histogram};
 
 pub fn record_llm_request(success: bool, duration: f64) {

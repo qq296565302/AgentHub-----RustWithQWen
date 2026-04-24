@@ -110,6 +110,7 @@ impl LLMConfig {
         self.providers.iter().find(|p| p.name == self.default_provider)
     }
 
+    #[allow(dead_code)]
     pub fn list_providers(&self) -> Vec<&str> {
         self.providers.iter().map(|p| p.name.as_str()).collect()
     }

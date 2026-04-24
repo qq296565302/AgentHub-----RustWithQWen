@@ -79,7 +79,7 @@ impl ConversationContext {
         self.updated_at = Utc::now();
     }
 
-    fn trim_to_context_window(&mut self, context_manager: &ContextManager) {
+    fn trim_to_context_window(&mut self, _context_manager: &ContextManager) {
         let mut total_tokens: usize = self.messages.iter().map(|m| m.token_count).sum();
 
         while total_tokens > self.max_tokens && !self.messages.is_empty() {

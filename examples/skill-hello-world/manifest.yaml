@@ -1,0 +1,104 @@
+# =============================================================================
+# Skill Manifest - 元数据定义
+# =============================================================================
+# 此文件定义了 Skill 的机器可读元数据，用于 AgentHub 加载和管理 Skill。
+# =============================================================================
+
+# Skill 唯一标识符（使用点分隔的命名空间格式）
+name: "example.hello.world"
+
+# 语义化版本号（遵循 SemVer 规范）
+version: "0.1.0"
+
+# 简短描述（在 Skill 列表中显示）
+description: "AgentHub Skill 开发入门示例 - 演示 WASM Skill 的标准结构和接口"
+
+# 作者信息
+author: "AgentHub Team"
+
+# 支持的接口类型
+# 可选值: "cli", "web", "vscode", "api"
+interfaces:
+  - "cli"
+  - "web"
+  - "api"
+
+# 是否需要文件系统写权限
+# true:  Skill 可以创建/修改文件
+# false: Skill 只读访问（更安全）
+requires_write: false
+
+# 输入参数 JSON Schema
+# 用于验证输入参数和生成帮助文档
+input_schema:
+  type: object
+  properties:
+    operation:
+      type: string
+      description: "操作类型"
+      enum:
+        # 基础操作
+        - greet
+        - echo
+        - math
+        # 沙箱安全测试操作
+        - test_fs_read
+        - test_fs_write
+        - test_env
+        - test_network
+    name:
+      type: string
+      description: "操作参数。greet 模式下为用户名，echo 模式下为回显内容"
+      default: "World"
+    a:
+      type: number
+      description: "数学计算第一个操作数（仅 math 模式使用）"
+      default: 0
+    b:
+      type: number
+      description: "数学计算第二个操作数（仅 math 模式使用）"
+      default: 0
+  required:
+    - operation
+
+# 输出格式说明
+output_schema:
+  type: object
+  properties:
+    output:
+      type: object
+      description: "主要输出内容，根据 operation 不同有不同结构"
+    files_created:
+      type: array
+      items:
+        type: string
+      description: "创建的文件路径列表"
+    warnings:
+      type: array
+      items:
+        type: string
+      description: "警告信息列表"
+
+# 使用示例
+examples:
+  - description: "发送问候"
+    input: '{"operation": "greet", "name": "Alice"}'
+    output: '{"message": "Hello, Alice! Welcome to AgentHub Skill!"}'
+  - description: "回显内容"
+    input: '{"operation": "echo", "name": "test_data"}'
+    output: '{"echoed": "test_data"}'
+  - description: "数学计算"
+    input: '{"operation": "math", "a": 3.5, "b": 2.1}'
+    output: '{"result": 5.6, "formula": "3.5 + 2.1 = 5.6"}'
+  - description: "测试文件读取隔离"
+    input: '{"operation": "test_fs_read"}'
+    output: '{"test": "文件系统读取", "result": "PASS: 沙箱生效！..."}'
+  - description: "测试文件写入隔离"
+    input: '{"operation": "test_fs_write"}'
+    output: '{"test": "文件系统写入", "result": "PASS: 沙箱生效！..."}'
+  - description: "测试环境变量隔离"
+    input: '{"operation": "test_env"}'
+    output: '{"test": "环境变量访问", "result": "PASS/WARN: ..."}'
+  - description: "测试网络隔离"
+    input: '{"operation": "test_network"}'
+    output: '{"test": "网络连接", "result": "PASS: 沙箱生效！..."}'

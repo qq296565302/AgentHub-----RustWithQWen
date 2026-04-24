@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};

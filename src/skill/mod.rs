@@ -1,8 +1,10 @@
 pub mod builtins;
+pub mod external;
+pub mod manager;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::error::{Result, SkillError};
+use crate::error::Result;
 
 #[async_trait]
 pub trait SkillExecutor: Send + Sync {
@@ -15,6 +17,7 @@ pub trait SkillExecutor: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct ExecutionContext {
+    #[allow(dead_code)]
     pub user_id: String,
     pub workspace_dir: std::path::PathBuf,
 }

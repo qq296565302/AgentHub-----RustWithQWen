@@ -9,10 +9,11 @@ pub mod rate_limiter;
 pub mod input_validator;
 
 use crate::config::SecurityConfig;
-use crate::error::{Result, SecurityError, SecurityLevel};
+use crate::error::{Result, SecurityLevel};
 
 pub struct SecurityCheckResult {
     pub level: SecurityLevel,
+    #[allow(dead_code)]
     pub sanitized_input: Option<String>,
     pub warnings: Vec<String>,
 }
@@ -26,6 +27,7 @@ impl SecurityCheckResult {
         }
     }
 
+    #[allow(dead_code)]
     pub fn warn(message: String) -> Self {
         Self {
             level: SecurityLevel::Warn(message.clone()),
@@ -56,8 +58,11 @@ pub struct SecurityPipeline {
     input_validator: input_validator::InputValidator,
     prompt_injection_guard: prompt_injection::PromptInjectionGuard,
     pii_guard: pii_detector::PIIRedactionGuard,
+    #[allow(dead_code)]
     unicode_guard: unicode_security::UnicodeSecurityGuard,
+    #[allow(dead_code)]
     file_access_guard: file_access::FileAccessGuard,
+    #[allow(dead_code)]
     network_guard: network_guard::NetworkGuard,
     output_sanitizer: output_sanitizer::OutputSanitizer,
     rate_limiter: rate_limiter::RateLimiter,
@@ -155,10 +160,12 @@ impl SecurityPipeline {
         self.output_sanitizer.sanitize(output)
     }
 
+    #[allow(dead_code)]
     pub fn check_file_access(&self, path: &str) -> Result<()> {
         self.file_access_guard.check_access(path)
     }
 
+    #[allow(dead_code)]
     pub fn check_network_access(&self, domain: &str) -> Result<()> {
         self.network_guard.check_access(domain)
     }

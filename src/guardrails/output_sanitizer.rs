@@ -1,4 +1,4 @@
-use crate::error::{Result, SecurityError};
+use crate::error::Result;
 use crate::guardrails::pii_detector::PIIRedactionGuard;
 
 pub struct OutputSanitizer {

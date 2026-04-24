@@ -60,10 +60,12 @@ impl MultiLLMClient {
         self.current_provider.read().await.clone()
     }
 
+    #[allow(dead_code)]
     pub async fn list_providers(&self) -> Vec<String> {
         self.clients.read().await.keys().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub async fn add_provider(&self, config: &LLMProviderConfig) {
         let client = Self::create_client(config);
         self.clients.write().await.insert(config.name.clone(), client);

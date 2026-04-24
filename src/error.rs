@@ -111,6 +111,7 @@ pub enum SecurityError {
 #[derive(Debug, Clone)]
 pub enum SecurityLevel {
     Pass,
+    #[allow(dead_code)]
     Warn(String),
     Block(String),
 }

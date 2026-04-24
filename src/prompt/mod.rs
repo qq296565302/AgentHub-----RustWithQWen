@@ -1,10 +1,11 @@
+#![allow(dead_code)]
+
 pub mod templates;
 pub mod context_manager;
 pub mod model_adapter;
 pub mod conversation;
 
-pub use conversation::{ConversationManager, ConversationContext};
-pub use context_manager::ContextManager;
+pub use conversation::ConversationManager;
 
 use handlebars::Handlebars;
 

@@ -1,5 +1,5 @@
 use crate::config::Settings;
-use crate::error::{AgentHubError, Result, SecurityLevel};
+use crate::error::{AgentHubError, SecurityLevel};
 use crate::guardrails::SecurityPipeline;
 use crate::llm::LLMClient;
 use crate::skill::SkillRegistry;
@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub struct AppState {
+    #[allow(dead_code)]
     pub settings: Settings,
+    #[allow(dead_code)]
     pub llm_client: Arc<dyn LLMClient>,
     pub skill_registry: SkillRegistry,
     pub security_pipeline: Arc<SecurityPipeline>,
@@ -22,7 +24,9 @@ pub struct AppState {
 pub struct ExplainRequest {
     pub file_path: String,
     pub function_name: Option<String>,
+    #[allow(dead_code)]
     pub line_range: Option<(usize, usize)>,
+    #[allow(dead_code)]
     pub language: Option<String>,
 }
 
@@ -37,6 +41,7 @@ pub struct ExplainResponse {
 pub struct TestRequest {
     pub file_path: String,
     pub function_name: String,
+    #[allow(dead_code)]
     pub language: Option<String>,
 }
 

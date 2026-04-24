@@ -78,6 +78,10 @@ lazy_static = "1.4"
 comrak = "0.24"
 crossterm = "0.27"
 
+wasmtime = "15"
+wasmtime-wasi = "15"
+libloading = "0.8"
+
 [features]
 default = ["core-languages"]
 core-languages = [

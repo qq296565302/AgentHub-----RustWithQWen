@@ -6,6 +6,7 @@ use std::sync::Mutex;
 
 pub struct MockLLMClient {
     responses: Mutex<VecDeque<String>>,
+    #[allow(dead_code)]
     model: Mutex<String>,
 }
 
@@ -17,6 +18,7 @@ impl MockLLMClient {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_response(&self, response: &str) {
         self.responses.lock().unwrap().push_back(response.to_string());
     }

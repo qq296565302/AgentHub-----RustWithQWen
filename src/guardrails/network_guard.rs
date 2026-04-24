@@ -13,9 +13,13 @@ lazy_static! {
 }
 
 pub struct NetworkGuard {
+    #[allow(dead_code)]
     enabled: bool,
+    #[allow(dead_code)]
     allow_external: bool,
+    #[allow(dead_code)]
     allowed_domains: Vec<String>,
+    #[allow(dead_code)]
     block_internal_ips: bool,
 }
 
@@ -29,6 +33,7 @@ impl NetworkGuard {
         }
     }
 
+    #[allow(dead_code)]
     pub fn check_access(&self, domain: &str) -> Result<()> {
         if !self.enabled {
             return Ok(());

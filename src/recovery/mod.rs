@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod circuit_breaker;
 pub mod resilient_llm;
 pub mod fallback;

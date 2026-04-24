@@ -3,7 +3,6 @@ use crate::llm::{ChatMessage, LLMClient};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tokio::time::{timeout, Duration};
 
 #[derive(Debug)]
@@ -11,6 +10,7 @@ pub struct OllamaClient {
     client: Client,
     base_url: String,
     model: String,
+    #[allow(dead_code)]
     connect_timeout: Duration,
     read_timeout: Duration,
 }

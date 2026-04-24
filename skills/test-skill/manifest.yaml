@@ -1,0 +1,6 @@
+name: "test.skill"
+version: "0.1.0"
+description: "测试用 WASM Skill - 验证沙箱功能"
+author: "AgentHub"
+interfaces: ["execute"]
+requires_write: false

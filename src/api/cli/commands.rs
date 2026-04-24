@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -12,6 +11,10 @@ pub enum Command {
         function_name: String,
     },
     Skills,
+    Run {
+        skill_name: String,
+        params: String,
+    },
     Audit {
         user_id: Option<String>,
         skill_name: Option<String>,
@@ -60,6 +63,7 @@ impl Command {
                 "explain" | "e" => Self::parse_explain(parts),
                 "test" | "t" => Self::parse_test(parts),
                 "skills" | "s" => Ok(Command::Skills),
+                "run" | "r" => Self::parse_run(parts),
                 "audit" | "a" => Self::parse_audit(parts),
                 "config" | "c" => Ok(Command::Config),
                 "provider" | "p" => Self::parse_provider(parts),
@@ -164,6 +168,19 @@ impl Command {
         })
     }
 
+    fn parse_run(parts: Vec<&str>) -> Result<Self, String> {
+        if parts.len() < 2 {
+            return Err("Usage: /run <skill_name> [params_json]".to_string());
+        }
+        let skill_name = parts[1].to_string();
+        let params = if parts.len() > 2 {
+            parts[2..].join(" ")
+        } else {
+            "{}".to_string()
+        };
+        Ok(Command::Run { skill_name, params })
+    }
+
     fn parse_audit(parts: Vec<&str>) -> Result<Self, String> {
         let user_id = parts.get(1).map(|s| s.to_string());
         let skill_name = parts.get(2).map(|s| s.to_string());
@@ -174,6 +191,7 @@ impl Command {
 pub fn format_command_help() -> String {
     vec![
         ("/skills", "List available skills with descriptions"),
+        ("/run <skill> [params]", "Execute a skill with optional JSON params"),
         ("/explain <file>[:line] | <file>::<fn>", "Explain code in a file"),
         ("/test <file> <function>", "Generate unit tests for a function"),
         ("/audit [user] [skill]", "Query audit logs"),

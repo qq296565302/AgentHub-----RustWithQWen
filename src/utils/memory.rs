@@ -1,4 +1,3 @@
-use std::process;
 
 #[cfg(target_os = "linux")]
 pub fn get_current_memory_bytes() -> u64 {

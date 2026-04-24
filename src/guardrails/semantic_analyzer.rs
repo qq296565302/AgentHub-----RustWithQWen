@@ -1,5 +1,7 @@
+#[allow(dead_code)]
 pub struct SemanticAnalyzerGuard;
 
+#[allow(dead_code)]
 impl SemanticAnalyzerGuard {
     pub fn new() -> Self {
         Self

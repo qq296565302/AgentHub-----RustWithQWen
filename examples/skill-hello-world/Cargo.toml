@@ -1,0 +1,44 @@
+# =============================================================================
+# Skill Hello World - WASM 示例项目
+# =============================================================================
+# 这是 AgentHub 的 Skill 开发入门示例项目。
+# 它演示了如何编写一个可以在 WASM 沙箱中运行的 Skill。
+#
+# 编译为 WASM:
+#   cargo build --target wasm32-wasip1 --release
+#
+# 编译产物:
+#   target/wasm32-wasip1/release/skill_hello_world.wasm
+# =============================================================================
+
+[package]
+name = "skill-hello-world"
+version = "0.1.0"
+edition = "2021"
+description = "AgentHub Skill 开发入门示例 - 演示 WASM Skill 的标准结构和接口"
+authors = ["AgentHub Team"]
+
+# 此项目独立于主工作区，不受主项目影响
+[workspace]
+
+# ---------------------------------------------------------------------------
+# 关键配置：crate-type 必须包含 "cdylib"
+# ---------------------------------------------------------------------------
+# cdylib = C dynamic library，这是 WASM 模块所需的编译产物类型。
+# 如果缺少此配置，cargo 将编译为 rlib（Rust 静态库），WASM 加载器无法识别。
+[lib]
+crate-type = ["cdylib"]
+
+# ---------------------------------------------------------------------------
+# 依赖说明：
+#   serde      - 用于 JSON 序列化/反序列化（输入参数解析和输出结果构建）
+#   serde_json - JSON 格式支持
+#   libc       - 用于 WASM 内存分配（malloc）
+#
+# 注意：WASM Skill 运行在沙箱中，不应依赖需要系统调用的库（如 tokio、reqwest）。
+# 如果需要网络或异步功能，应通过宿主环境提供的接口实现。
+# ---------------------------------------------------------------------------
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"

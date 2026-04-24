@@ -1,12 +1,13 @@
-use crate::error::Result;
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
+#[allow(dead_code)]
 pub struct LLMCache {
     cache: Mutex<LruCache<String, String>>,
 }
 
+#[allow(dead_code)]
 impl LLMCache {
     pub fn new(max_size: usize) -> Self {
         let cache_size = NonZeroUsize::new(max_size).unwrap_or(NonZeroUsize::new(1000).unwrap());

@@ -1,7 +1,9 @@
 use unicode_normalization::UnicodeNormalization;
 
+#[allow(dead_code)]
 pub struct UnicodeSecurityGuard;
 
+#[allow(dead_code)]
 impl UnicodeSecurityGuard {
     pub fn new() -> Self {
         Self

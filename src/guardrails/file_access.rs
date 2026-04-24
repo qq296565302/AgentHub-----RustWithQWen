@@ -9,9 +9,13 @@ lazy_static! {
 }
 
 pub struct FileAccessGuard {
+    #[allow(dead_code)]
     enabled: bool,
+    #[allow(dead_code)]
     workspace_dir: PathBuf,
+    #[allow(dead_code)]
     sensitive_files: Vec<String>,
+    #[allow(dead_code)]
     allow_symlinks: bool,
 }
 
@@ -33,6 +37,7 @@ impl FileAccessGuard {
         }
     }
 
+    #[allow(dead_code)]
     pub fn check_access(&self, path: &str) -> Result<()> {
         if !self.enabled {
             return Ok(());
@@ -77,6 +82,7 @@ impl FileAccessGuard {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn is_within_workspace(&self, path: &str) -> bool {
         let path_obj = Path::new(path).canonicalize().ok();
         if let Some(canonical) = path_obj {
