@@ -33,6 +33,19 @@ pub enum Command {
     Clear,
     Help,
     Exit,
+    SkillHub {
+        action: SkillHubAction,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum SkillHubAction {
+    Search { query: String },
+    Info { skill_id: String },
+    Install { skill_id: String, version: Option<String> },
+    Uninstall { skill_name: String },
+    Update { skill_name: Option<String> },
+    ListRemote,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +82,7 @@ impl Command {
                 "provider" | "p" => Self::parse_provider(parts),
                 "providers" | "ps" => Ok(Command::Providers),
                 "conv" | "conversation" => Self::parse_conversation(parts),
+                "skillhub" | "sh" => Self::parse_skillhub(parts),
                 "clear" => Ok(Command::Clear),
                 "help" | "h" | "?" => Ok(Command::Help),
                 "exit" | "quit" | "q" => Ok(Command::Exit),
@@ -186,12 +200,74 @@ impl Command {
         let skill_name = parts.get(2).map(|s| s.to_string());
         Ok(Command::Audit { user_id, skill_name })
     }
+
+    fn parse_skillhub(parts: Vec<&str>) -> Result<Self, String> {
+        if parts.len() < 2 {
+            return Ok(Command::SkillHub {
+                action: SkillHubAction::ListRemote,
+            });
+        }
+
+        match parts[1] {
+            "search" | "s" => {
+                let query = parts.get(2)
+                    .ok_or("Usage: /skillhub search <query>")?
+                    .to_string();
+                Ok(Command::SkillHub {
+                    action: SkillHubAction::Search { query },
+                })
+            }
+            "info" | "i" => {
+                let skill_id = parts.get(2)
+                    .ok_or("Usage: /skillhub info <skill_id>")?
+                    .to_string();
+                Ok(Command::SkillHub {
+                    action: SkillHubAction::Info { skill_id },
+                })
+            }
+            "install" | "add" => {
+                let skill_id = parts.get(2)
+                    .ok_or("Usage: /skillhub install <skill_id> [version]")?
+                    .to_string();
+                let version = parts.get(3).map(|s| s.to_string());
+                Ok(Command::SkillHub {
+                    action: SkillHubAction::Install { skill_id, version },
+                })
+            }
+            "uninstall" | "remove" | "rm" => {
+                let skill_name = parts.get(2)
+                    .ok_or("Usage: /skillhub uninstall <skill_name>")?
+                    .to_string();
+                Ok(Command::SkillHub {
+                    action: SkillHubAction::Uninstall { skill_name },
+                })
+            }
+            "update" | "up" => {
+                let skill_name = parts.get(2).map(|s| s.to_string());
+                Ok(Command::SkillHub {
+                    action: SkillHubAction::Update { skill_name },
+                })
+            }
+            "list" | "ls" => Ok(Command::SkillHub {
+                action: SkillHubAction::ListRemote,
+            }),
+            _ => Ok(Command::SkillHub {
+                action: SkillHubAction::ListRemote,
+            }),
+        }
+    }
 }
 
 pub fn format_command_help() -> String {
     vec![
         ("/skills", "List available skills with descriptions"),
         ("/run <skill> [params]", "Execute a skill with optional JSON params"),
+        ("/skillhub search <query>", "Search skills on SkillHub (GitHub Releases)"),
+        ("/skillhub info <id>", "Show skill detail"),
+        ("/skillhub install <id> [ver]", "Download and install a skill"),
+        ("/skillhub uninstall <name>", "Remove a local skill"),
+        ("/skillhub update [name]", "Check/install updates"),
+        ("/skillhub list", "List all available skills"),
         ("/explain <file>[:line] | <file>::<fn>", "Explain code in a file"),
         ("/test <file> <function>", "Generate unit tests for a function"),
         ("/audit [user] [skill]", "Query audit logs"),

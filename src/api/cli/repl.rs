@@ -1,4 +1,4 @@
-use crate::api::cli::commands::{Command, ConversationAction, format_command_help};
+use crate::api::cli::commands::{Command, ConversationAction, SkillHubAction, format_command_help};
 use crate::api::cli::nl_command_parser::NaturalLanguageCommandParser;
 use crate::audit::AuditLogger;
 use crate::config::Settings;
@@ -9,6 +9,7 @@ use crate::prompt::ConversationManager;
 use crate::skill::external::external_loader::{ExternalSkillLoader, ExternalSkillConfig};
 use crate::skill::builtins::code_explainer::CodeExplainerSkill;
 use crate::skill::builtins::test_generator::TestGeneratorSkill;
+use crate::skill::skillhub::{SkillHubClient, SkillHubRegistry};
 use crate::skill::{ExecutionContext, SkillRegistry};
 use crate::utils::markdown::render_markdown;
 use rustyline::error::ReadlineError;
@@ -203,6 +204,9 @@ impl Repl {
             Command::Exit => {
                 println!("再见！");
                 std::process::exit(0);
+            }
+            Command::SkillHub { action } => {
+                self.execute_skillhub(action).await
             }
         }
     }
@@ -647,6 +651,188 @@ impl Repl {
                 let error_msg = format!("错误: {}", e);
                 println!("{}", error_msg);
                 Ok(error_msg)
+            }
+        }
+    }
+
+    async fn execute_skillhub(&self, action: SkillHubAction) -> Result<String> {
+        let registry = SkillHubRegistry::with_default()
+            .map_err(|e| crate::error::AgentHubError::Internal(format!("初始化 SkillHub 失败: {}", e)))?;
+
+        match action {
+            SkillHubAction::Search { query } => {
+                println!("\n正在搜索 Skill: '{}'...", query);
+                match registry.search(&query).await {
+                    Ok(result) => {
+                        if result.skills.is_empty() {
+                            println!("未找到匹配的 Skill。");
+                            return Ok("未找到匹配的 Skill".to_string());
+                        }
+                        let mut output = format!("\n找到 {} 个匹配的 Skill:\n", result.skills.len());
+                        output.push_str(&format!("{:<35} {:<10} {:<12} {}\n", "名称", "版本", "下载次数", "描述"));
+                        output.push_str(&"-".repeat(90));
+                        output.push('\n');
+                        for skill in &result.skills {
+                            output.push_str(&format!(
+                                "{:<35} {:<10} {:<12} {}\n",
+                                skill.id,
+                                skill.version,
+                                skill.downloads,
+                                skill.description.chars().take(30).collect::<String>()
+                            ));
+                        }
+                        println!("{}", output);
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        let error_msg = format!("搜索失败: {}", e);
+                        println!("{}", error_msg);
+                        Err(crate::error::AgentHubError::Internal(error_msg))
+                    }
+                }
+            }
+            SkillHubAction::Info { skill_id } => {
+                println!("\n正在获取 Skill 详情: '{}'...", skill_id);
+                let client = SkillHubClient::with_default_config()
+                    .map_err(|e| crate::error::AgentHubError::Internal(format!("创建客户端失败: {}", e)))?;
+                match client.get_skill_detail(&skill_id).await {
+                    Ok(detail) => {
+                        let mut output = format!("\nSkill 详情:\n");
+                        output.push_str(&format!("  ID: {}\n", detail.id));
+                        output.push_str(&format!("  版本: {}\n", detail.manifest.version));
+                        output.push_str(&format!("  描述: {}\n", detail.manifest.description));
+                        output.push_str(&format!("  大小: {} KB\n", detail.file_size / 1024));
+                        output.push_str(&format!("  可用版本: {:?}\n", detail.available_versions));
+                        output.push_str(&format!("  更新说明:\n{}\n", detail.changelog));
+                        output.push_str(&format!("  页面: {}\n", detail.html_url));
+                        println!("{}", output);
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        let error_msg = format!("获取详情失败: {}", e);
+                        println!("{}", error_msg);
+                        Err(crate::error::AgentHubError::Internal(error_msg))
+                    }
+                }
+            }
+            SkillHubAction::Install { skill_id, version } => {
+                let version_str = version.as_deref().unwrap_or("latest");
+                println!("\n正在安装 Skill: '{}' (版本: {})...", skill_id, version_str);
+                match registry.install(&skill_id, version.as_deref()).await {
+                    Ok(status) => {
+                        let output = format!(
+                            "\nSkill '{}' 安装成功!\n  版本: {}\n  路径: {:?}\n  状态: {}",
+                            status.name, status.version, status.wasm_path,
+                            if status.enabled { "已启用" } else { "已禁用" }
+                        );
+                        println!("{}", output);
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        let error_msg = format!("安装失败: {}", e);
+                        println!("{}", error_msg);
+                        Err(crate::error::AgentHubError::Internal(error_msg))
+                    }
+                }
+            }
+            SkillHubAction::Uninstall { skill_name } => {
+                println!("\n正在卸载 Skill: '{}'...", skill_name);
+                match registry.uninstall(&skill_name) {
+                    Ok(()) => {
+                        let output = format!("Skill '{}' 已卸载", skill_name);
+                        println!("{}", output);
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        let error_msg = format!("卸载失败: {}", e);
+                        println!("{}", error_msg);
+                        Err(crate::error::AgentHubError::Internal(error_msg))
+                    }
+                }
+            }
+            SkillHubAction::Update { skill_name } => {
+                if let Some(name) = skill_name {
+                    println!("\n正在更新 Skill: '{}'...", name);
+                    match registry.update(&name).await {
+                        Ok(status) => {
+                            let output = format!(
+                                "Skill '{}' 已更新到版本 {}",
+                                status.name, status.version
+                            );
+                            println!("{}", output);
+                            Ok(output)
+                        }
+                        Err(e) => {
+                            let error_msg = format!("更新失败: {}", e);
+                            println!("{}", error_msg);
+                            Err(crate::error::AgentHubError::Internal(error_msg))
+                        }
+                    }
+                } else {
+                    println!("\n正在检查所有 Skill 的更新...");
+                    match registry.check_all_updates().await {
+                        Ok(updates) => {
+                            if updates.is_empty() {
+                                println!("所有 Skill 都是最新版本。");
+                                return Ok("所有 Skill 都是最新版本".to_string());
+                            }
+                            let mut output = format!("\n发现 {} 个可用更新:\n", updates.len());
+                            output.push_str(&format!("{:<30} {:<12} {:<12} {}\n", "Skill", "当前版本", "最新版本", "兼容性"));
+                            output.push_str(&"-".repeat(80));
+                            output.push('\n');
+                            for update in &updates {
+                                output.push_str(&format!(
+                                    "{:<30} {:<12} {:<12} {}\n",
+                                    update.name,
+                                    update.current_version,
+                                    update.latest_version,
+                                    if update.is_compatible { "兼容" } else { "不兼容" }
+                                ));
+                            }
+                            output.push_str("\n使用 /skillhub update <name> 更新指定 Skill");
+                            println!("{}", output);
+                            Ok(output)
+                        }
+                        Err(e) => {
+                            let error_msg = format!("检查更新失败: {}", e);
+                            println!("{}", error_msg);
+                            Err(crate::error::AgentHubError::Internal(error_msg))
+                        }
+                    }
+                }
+            }
+            SkillHubAction::ListRemote => {
+                println!("\n正在获取 Skill 列表...");
+                match registry.list_remote().await {
+                    Ok(result) => {
+                        if result.skills.is_empty() {
+                            println!("SkillHub 上没有可用的 Skill。");
+                            return Ok("SkillHub 上没有可用的 Skill".to_string());
+                        }
+                        let mut output = format!("\nSkillHub 可用 Skill 列表 (共 {} 个):\n", result.skills.len());
+                        output.push_str(&format!("{:<35} {:<10} {:<12} {}\n", "名称", "版本", "下载次数", "描述"));
+                        output.push_str(&"-".repeat(90));
+                        output.push('\n');
+                        for skill in &result.skills {
+                            output.push_str(&format!(
+                                "{:<35} {:<10} {:<12} {}\n",
+                                skill.id,
+                                skill.version,
+                                skill.downloads,
+                                skill.description.chars().take(30).collect::<String>()
+                            ));
+                        }
+                        output.push_str("\n使用 /skillhub search <关键词> 搜索 Skill");
+                        output.push_str("\n使用 /skillhub install <id> 安装 Skill");
+                        println!("{}", output);
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        let error_msg = format!("获取列表失败: {}", e);
+                        println!("{}", error_msg);
+                        Err(crate::error::AgentHubError::Internal(error_msg))
+                    }
+                }
             }
         }
     }
